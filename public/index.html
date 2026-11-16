@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DMX Lighting Simulator</title>
+  <link rel="stylesheet" href="/style.css" />
+  <script type="importmap">
+    { "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <div id="view"></div>
+
+  <div id="status" class="pill">
+    <span class="dot" id="st-dot"></span>
+    <span id="st-text">Connecting to server…</span>
+  </div>
+
+  <div id="cams">
+    <button data-cam="overview" class="on">Overview</button>
+    <button data-cam="audience">Audience</button>
+    <button data-cam="dj">DJ</button>
+    <button data-cam="top">Top</button>
+  </div>
+
+  <button id="panel-toggle" aria-label="Panel">☰</button>
+  <aside id="panel">
+    <nav class="tabs">
+      <button data-tab="fixtures" class="on">Fixtures</button>
+      <button data-tab="dmx">DMX</button>
+      <button data-tab="view">View</button>
+    </nav>
+
+    <section data-pane="fixtures" class="on">
+      <div id="warnings"></div>
+      <ul id="fixture-list"></ul>
+    </section>
+
+    <section data-pane="dmx">
+      <div class="row">
+        <label>Universe <select id="dmx-universe"></select></label>
+        <span class="muted" id="dmx-info"></span>
+      </div>
+      <div id="dmx-grid"></div>
+    </section>
+
+    <section data-pane="view">
+      <label class="ctl">Haze <input type="range" id="haze" min="0" max="1.5" step="0.01" value="1.5" /></label>
+      <label class="ctl">Bloom <input type="checkbox" id="bloom" checked /></label>
+      <label class="ctl">Walls
+        <select id="walls">
+          <option value="full">Full height</option>
+          <option value="low" selected>Waist height</option>
+          <option value="off">Hidden</option>
+        </select>
+      </label>
+      <label class="ctl">Work light <input type="checkbox" id="worklight" checked /></label>
+      <label class="ctl">Resolution
+        <select id="quality">
+          <option value="0.75">Low</option>
+          <option value="1" selected>Normal</option>
+          <option value="2">High</option>
+        </select>
+      </label>
+      <div class="help">
+        <h4>Where to send Art-Net</h4>
+        <p id="net-info" class="mono"></p>
+        <p class="muted">Set your lighting software to output Art-Net to one of the IPs above (127.0.0.1 on the same machine), UDP port 6454. Net 0 / SubNet 0 / Universe 0 maps to universe 0 in patch.json.</p>
+        <h4>Controls</h4>
+        <p class="muted">Left drag: look around / Right drag: slide / Wheel: move forward/back / W A S D: move / Space: up / Shift: down / Click a fixture: show details</p>
+      </div>
+    </section>
+  </aside>
+
+  <script type="module" src="/main.js"></script>
+</body>
+</html>

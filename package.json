@@ -1,0 +1,25 @@
+{
+  "name": "dmxsim",
+  "version": "1.0.0",
+  "description": "Art-Netで動くDJイベント照明シミュレータ",
+  "scripts": {
+    "start": "node server.mjs",
+    "serve": "node server.mjs",
+    "demo": "node tools/artnet-demo.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TechnoTUT/dmxsim.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/TechnoTUT/dmxsim/issues"
+  },
+  "homepage": "https://github.com/TechnoTUT/dmxsim#readme",
+  "dependencies": {
+    "three": "0.170.0"
+  },
+  "private": true
+}

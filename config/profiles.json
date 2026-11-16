@@ -1,0 +1,115 @@
+{
+  "stage-evolution/minispot30": {
+    "name": "MINI SPOT 30",
+    "kind": "moving-spot",
+    "source": "Manual V1.00, 9-channel mode",
+    "beamAngle": 12,
+    "panRange": 540,
+    "tiltRange": 270,
+    "maxPanSpeed": 300,
+    "channels": [
+      { "key": "pan", "name": "PAN" },
+      { "key": "tilt", "name": "TILT" },
+      { "key": "color", "name": "Color" },
+      { "key": "gobo", "name": "Gobo" },
+      { "key": "strobe", "name": "Strobe" },
+      { "key": "dimmer", "name": "Dimmer" },
+      { "key": "ptSpeed", "name": "Pan/tilt speed" },
+      { "key": "program", "name": "Built-in program" },
+      { "key": "reset", "name": "Movement / reset" }
+    ],
+    "colorWheel": [
+      [0, 9, "#ffffff", "Open (white)"],
+      [10, 19, "#ff1a1a", "Red"],
+      [20, 29, "#1aff3a", "Green"],
+      [30, 39, "#2a3cff", "Blue"],
+      [40, 49, "#ffe21a", "Yellow"],
+      [50, 59, "#5ad0ff", "Light blue"],
+      [60, 69, "#ff8a1a", "Orange"],
+      [70, 79, "#ff2ad4", "Magenta"],
+      [80, 89, ["#ff2ad4", "#ff8a1a"], "Magenta / orange"],
+      [90, 99, ["#ff8a1a", "#5ad0ff"], "Orange / light blue"],
+      [100, 109, ["#5ad0ff", "#ffe21a"], "Light blue / yellow"],
+      [110, 119, ["#ffe21a", "#2a3cff"], "Yellow / blue"],
+      [120, 129, ["#2a3cff", "#1aff3a"], "Blue / green"],
+      [130, 139, ["#1aff3a", "#ff1a1a"], "Green / red"],
+      [140, 255, "rainbow", "Rainbow effect, slow → fast"]
+    ],
+    "goboWheel": [
+      [0, 7, 0, "Open"],
+      [8, 15, 1, "Gobo 1"],
+      [16, 24, 2, "Gobo 2"],
+      [25, 31, 3, "Gobo 3"],
+      [32, 39, 4, "Gobo 4"],
+      [40, 47, 5, "Gobo 5"],
+      [48, 55, 6, "Gobo 6"],
+      [56, 63, 7, "Gobo 7"],
+      [64, 71, 0, "Open"],
+      [72, 79, 1, "Gobo 1 shake"],
+      [80, 87, 2, "Gobo 2 shake"],
+      [88, 95, 3, "Gobo 3 shake"],
+      [96, 103, 4, "Gobo 4 shake"],
+      [104, 111, 5, "Gobo 5 shake"],
+      [112, 119, 6, "Gobo 6 shake"],
+      [120, 127, 7, "Gobo 7 shake"],
+      [128, 255, "rotate", "Gobo wheel rotation, slow → fast"]
+    ]
+  },
+
+  "stage-evolution/laserscan300": {
+    "name": "LASER SCAN 300",
+    "kind": "laser",
+    "source": "Manual V1.00 (SHD989), DMX chart",
+    "scanAngle": 50,
+    "channels": [
+      { "key": "mode", "name": "Mode (0-20 off / 221-255 DMX)" },
+      { "key": "group", "name": "Pattern group" },
+      { "key": "pattern", "name": "Pattern" },
+      { "key": "color", "name": "Color" },
+      { "key": "draw", "name": "Drawing" },
+      { "key": "size", "name": "Size / zoom" },
+      { "key": "zoomSpeed", "name": "Zoom speed" },
+      { "key": "xRoll", "name": "X roll" },
+      { "key": "xRollSpeed", "name": "X roll speed" },
+      { "key": "yRoll", "name": "Y roll" },
+      { "key": "yRollSpeed", "name": "Y roll speed" },
+      { "key": "zRot", "name": "Z rotation (0-191 CW / 192-255 CCW)" },
+      { "key": "zRotSpeed", "name": "Z rotation speed" },
+      { "key": "pan", "name": "Pan (0-127 position / 128- movement)" },
+      { "key": "panSpeed", "name": "Pan movement speed" },
+      { "key": "tilt", "name": "Tilt (0-127 position / 128- movement)" },
+      { "key": "tiltSpeed", "name": "Tilt movement speed" }
+    ]
+  },
+
+  "user/glp-185l": {
+    "name": "GLP-185L Par",
+    "kind": "par",
+    "source": "RGBWA, 5 channels (no dimmer or strobe channel)",
+    "beamAngle": 25,
+    "channels": [
+      { "key": "red", "name": "Red" },
+      { "key": "green", "name": "Green" },
+      { "key": "blue", "name": "Blue" },
+      { "key": "white", "name": "White" },
+      { "key": "amber", "name": "Amber" }
+    ]
+  },
+
+  "user/twinkle-ball": {
+    "name": "TWINKLE BALL DMX",
+    "kind": "twinkle-ball",
+    "source": "Manual V1.00 (SHD906), 8-channel mode",
+    "beams": 240,
+    "channels": [
+      { "key": "dimmer", "name": "Master dimmer" },
+      { "key": "strobe", "name": "Strobe" },
+      { "key": "red", "name": "Red" },
+      { "key": "green", "name": "Green" },
+      { "key": "blue", "name": "Blue" },
+      { "key": "motor", "name": "Motor (0-129 angle / 130-139 reset / 140- rotation)" },
+      { "key": "program", "name": "Program (10- auto 1-5 / 160- sound 1-2)" },
+      { "key": "programSpeed", "name": "Program speed" }
+    ]
+  }
+}
