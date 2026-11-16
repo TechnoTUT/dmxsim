@@ -79,13 +79,25 @@ Each fixture is sent on the universe set in `patch.json`. Stop the demo before u
 
 ## Using the simulator
 
-| Location | Contents |
-|---|---|
-| Top left | Art-Net status (packets/s, universes, source IP) |
-| Bottom left | Camera presets: Overview / Audience / DJ / Top |
-| Fixtures tab | Level, color and state of each fixture. Click a fixture in the list or in 3D to see its channel values |
-| DMX tab | 512-channel monitor; patched ranges are outlined in color |
-| View tab | Haze, bloom, walls, work light, frame rate limit, resolution, and where to send Art-Net |
+![Main screen](docs/images/ui-overview.webp)
+
+| # | Area | What it shows |
+|---|---|---|
+| 1 | Art-Net status | Green while receiving, with packets/s, universes and the source IP. Orange while waiting, or when the signal has stopped (the last values are held) |
+| 2 | Camera presets | Overview / Audience / DJ / Top |
+| 3 | Panel tabs | Fixtures / DMX / View |
+| 4 | Fixtures tab | Level, color and state of each fixture. Click a fixture in the list or in 3D to open its channel values; the source of its channel layout is shown underneath |
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/tab-dmx.webp" alt="DMX tab"></td>
+    <td width="50%"><img src="docs/images/tab-view.webp" alt="View tab"></td>
+  </tr>
+  <tr>
+    <td valign="top"><b>DMX tab</b>: all 512 channels of the selected universe. Patched ranges are outlined, one color per fixture; hover a cell to see which fixture and channel it is.</td>
+    <td valign="top"><b>View tab</b>: haze, bloom, walls (full height / waist height / hidden), work light, frame rate limit, resolution, and the addresses to send Art-Net to.</td>
+  </tr>
+</table>
 
 View settings are saved in the browser.
 
