@@ -340,6 +340,9 @@ bindPref('#walls', 'walls', (v) => {
   venue.wallGroup.scale.y = v === 'low' ? 1.1 / ceiling : 1;
 });
 bindPref('#worklight', 'work', (v) => { work.intensity = v ? 1.5 : 0; ambient.intensity = v ? 0.9 : 0.25; });
+// フレームレート上限（0 = 無制限）。高リフレッシュレートの画面でGPUを使い切らないように
+let fpsCap = 60;
+bindPref('#fps', 'fps', (v) => (fpsCap = Number(v)));
 bindPref('#quality', 'quality', (v) => { renderer.setPixelRatio(Math.min(devicePixelRatio, Number(v))); onResize(); });
 
 function onResize() {
@@ -394,7 +397,14 @@ function keyboardMove(dt) {
 
 const clock = new THREE.Clock();
 let uiTick = 0;
-function frame() {
+let nextFrameAt = 0;
+function frame(now = performance.now()) {
+  requestAnimationFrame(frame);
+  if (fpsCap > 0) {
+    // 次に描く時刻を一定間隔で進める（2ms の揺らぎは許容）。遅れたときは今を基準にやり直す
+    if (now < nextFrameAt - 2) return;
+    nextFrameAt = Math.max(nextFrameAt + 1000 / fpsCap, now);
+  }
   const dt = Math.min(0.05, clock.getDelta());
   const t = clock.elapsedTime;
   for (const f of fixtures) f.update(dt, t);
@@ -407,7 +417,6 @@ function frame() {
     updateFixturePanel();
     if ($('[data-pane="dmx"]').classList.contains('on')) updateDmxPanel();
   }
-  requestAnimationFrame(frame);
 }
 renderStatus();
 frame();

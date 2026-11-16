@@ -37,7 +37,7 @@ Server options: `node server.mjs --http 8080 --artnet 6454 --bind 0.0.0.0`
 | Bottom left | Camera presets: Overview / Audience / DJ / Top |
 | Right panel, Fixtures tab | Level, color and state of each fixture. Click a fixture (in the list or in 3D) to see its channel values |
 | Right panel, DMX tab | 512-channel monitor; patched ranges are outlined in color |
-| Right panel, View tab | Haze amount, bloom, wall height, work light, render resolution |
+| Right panel, View tab | Haze amount, bloom, wall height, work light, frame rate limit (default 60 fps), render resolution |
 
 Camera controls (first-person): left drag = look around (turns your head in place), right drag = slide, wheel = move forward/back, **W/A/S/D** = move forward/left/back/right, **Space** = up, **Shift** = down.
 

@@ -131,7 +131,7 @@ void main() {
   tEnter = clamp(tEnter, 0.0, 1.0);
   float worldLen = length(vWorld - cameraPosition) * (1.0 - tEnter);
 
-  const int STEPS = 32;
+  const int STEPS = 16; // 1画素あたりのサンプル数。jitter で縞を目立たなくしている
   float dt = (1.0 - tEnter) / float(STEPS);
   float jitter = hash(gl_FragCoord.xy);
   float cr = cos(uGoboRot), sr = sin(uGoboRot);

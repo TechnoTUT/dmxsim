@@ -50,12 +50,19 @@
       <label class="ctl">Bloom <input type="checkbox" id="bloom" checked /></label>
       <label class="ctl">Walls
         <select id="walls">
-          <option value="full">Full height</option>
-          <option value="low" selected>Waist height</option>
+          <option value="full" selected>Full height</option>
+          <option value="low">Waist height</option>
           <option value="off">Hidden</option>
         </select>
       </label>
       <label class="ctl">Work light <input type="checkbox" id="worklight" checked /></label>
+      <label class="ctl">Frame rate limit
+        <select id="fps">
+          <option value="30">30 fps</option>
+          <option value="60" selected>60 fps</option>
+          <option value="0">Unlimited</option>
+        </select>
+      </label>
       <label class="ctl">Resolution
         <select id="quality">
           <option value="0.75">Low</option>
