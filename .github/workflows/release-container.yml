@@ -1,32 +1,43 @@
 name: Build and push the container image
 
-# push のたびにビルドし、k8s のクラスタ内のレジストリに push する。
-# TechnoTUT/Infra の k8s で動く self-hosted runner (runner scale set: k8s) で実行する。
+# main に push するたびにビルドし、GitHub Container Registry (ghcr.io) に置く。
+# TechnoTUT/Infra の k8s/manifest/dmxsim が ghcr.io/technotut/dmxsim:main を使う。
 on:
   workflow_dispatch:
   push:
+    branches: [main]
 
 env:
-  # クラスタ内のレジストリ (HTTP。名前は bind9 にある。クラスタの外からは届かない)
-  REGISTRY: registry.svc.technotut.net
+  REGISTRY: ghcr.io
   IMAGE_NAME: technotut/dmxsim
 
 jobs:
   build-and-push-image:
-    runs-on: k8s
+    runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # タグ: ブランチ名 (main) と、コミットごとの sha-xxxxxxx
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha
 
-      # runner の dind はクラスタ内のレジストリを insecure-registry として扱うので、ログインは不要。
       - name: Build and push the image
         uses: docker/build-push-action@v5
         with:

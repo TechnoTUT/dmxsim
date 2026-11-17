@@ -204,7 +204,7 @@ podman build -f Containerfile -t dmxsim .
 podman run --rm -p 8080:8080 -p 6454:6454/udp dmxsim
 ```
 
-On every push, GitHub Actions builds the image on TechnoTUT's self-hosted runner and pushes it to the cluster registry as `registry.svc.technotut.net/technotut/dmxsim:main` (`.github/workflows/release-container.yml`). The cluster deployment lives in [TechnoTUT/Infra](https://github.com/TechnoTUT/Infra) (`k8s/manifest/dmxsim/`): send Art-Net to `dmxsim.svc.technotut.net` (`10.12.241.254`, UDP 6454) and open <http://dmxsim.svc.technotut.net/>. Broadcast and ArtPoll discovery do not reach the cluster, so set that address directly in your lighting software.
+On every push to `main`, GitHub Actions builds the image and pushes it to the GitHub Container Registry as `ghcr.io/technotut/dmxsim:main` (and `sha-<commit>`; see `.github/workflows/release-container.yml`). The cluster deployment lives in [TechnoTUT/Infra](https://github.com/TechnoTUT/Infra) (`k8s/manifest/dmxsim/`): send Art-Net to `dmxsim.svc.technotut.net` (`10.12.241.254`, UDP 6454) and open <http://dmxsim.svc.technotut.net/>. Broadcast and ArtPoll discovery do not reach the cluster, so set that address directly in your lighting software.
 
 The configuration and floor plan are built into the image. After changing them, push to this repository and restart the deployment (`kubectl -n dmxsim rollout restart deployment/dmxsim`) so the new image is pulled.
 
