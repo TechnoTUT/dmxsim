@@ -41,10 +41,13 @@ When Art-Net is arriving, the indicator at the top left turns green. If the sign
 | `--http <port>` | `HTTP_PORT` | `8080` |
 | `--artnet <port>` | `ARTNET_PORT` | `6454` |
 | `--bind <address>` | — | `0.0.0.0` |
+| `--advertise <list>` | `ADVERTISE` | this machine's IPv4 addresses |
 
 ```bash
 npm run serve -- --http 8090
 ```
+
+`--advertise` sets the addresses shown as "Where to send Art-Net" and used in ArtPoll replies (comma-separated host names or IPs). Use it when the machine's own address is not the one senders should use, e.g. inside a container behind a load balancer.
 
 ### Demo signal
 
@@ -194,6 +197,17 @@ If you redraw the plan with the same layer structure, the changes show up automa
 | A fixture does not respond | Its address and universe in `patch.json` match your software's patch, and the address-overlap warning is not shown |
 | High GPU usage | In the View tab, lower Resolution, turn off Bloom, or set the frame rate limit to 30 fps |
 
+## Running in a container
+
+```bash
+podman build -f Containerfile -t dmxsim .
+podman run --rm -p 8080:8080 -p 6454:6454/udp dmxsim
+```
+
+On every push, GitHub Actions builds the image on TechnoTUT's self-hosted runner and pushes it to the cluster registry as `registry.svc.technotut.net/technotut/dmxsim:main` (`.github/workflows/release-container.yml`). The cluster deployment lives in [TechnoTUT/Infra](https://github.com/TechnoTUT/Infra) (`k8s/manifest/dmxsim/`): send Art-Net to `dmxsim.svc.technotut.net` (`10.12.241.254`, UDP 6454) and open <http://dmxsim.svc.technotut.net/>. Broadcast and ArtPoll discovery do not reach the cluster, so set that address directly in your lighting software.
+
+The configuration and floor plan are built into the image. After changing them, push to this repository and restart the deployment (`kubectl -n dmxsim rollout restart deployment/dmxsim`) so the new image is pulled.
+
 ## Project structure
 
 ```
@@ -209,6 +223,7 @@ config/
   profiles.json         fixture channel layouts
 tools/artnet-demo.mjs   demo Art-Net sender
 commons.svg             venue floor plan
+Containerfile           container image
 ```
 
 ## License

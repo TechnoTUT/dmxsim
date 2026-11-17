@@ -1,6 +1,6 @@
 // DMX照明シミュレータ: Art-Net受信 + HTTP/SSE配信サーバ（依存なし）
 //
-//   node server.mjs [--http 8080] [--artnet 6454] [--bind 0.0.0.0]
+//   node server.mjs [--http 8080] [--artnet 6454] [--bind 0.0.0.0] [--advertise host,ip,...]
 //
 // Art-Net (UDP 6454) で受けた ArtDmx をユニバースごとに保持し、
 // ブラウザへ Server-Sent Events で送る。ArtPoll には ArtPollReply を返すので
@@ -22,6 +22,13 @@ function arg(name, def) {
 const HTTP_PORT = Number(arg('http', process.env.HTTP_PORT || 8080));
 const ARTNET_PORT = Number(arg('artnet', process.env.ARTNET_PORT || 6454));
 const BIND = arg('bind', '0.0.0.0');
+// 画面と ArtPollReply に出す送信先アドレス。コンテナ内などで、自分のインターフェイスの IP
+// （Pod の IP など）が外から届かないときに、LoadBalancer の IP や DNS 名を指定する。
+const ADVERTISE = String(arg('advertise', process.env.ADVERTISE || ''))
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+const isIPv4 = (s) => /^\d{1,3}(\.\d{1,3}){3}$/.test(s);
 const PUSH_HZ = 44; // ブラウザへ送る最大レート
 
 // ---------------------------------------------------------------- DMX state
@@ -74,13 +81,15 @@ udp.on('message', (msg, rinfo) => {
 
 function localIPv4() {
   for (const list of Object.values(os.networkInterfaces())) {
-    for (const ni of list || []) if (ni.family === 'IPv4' && !ni.internal) return ni;
+    for (const ni of list || []) if (ni.family === 'IPv4' && !ni.internal) return { ...ni };
   }
   return { address: '127.0.0.1', mac: '00:00:00:00:00:00' };
 }
 
 function sendPollReply(to) {
   const ni = localIPv4();
+  const advertised = ADVERTISE.find(isIPv4);
+  if (advertised) ni.address = advertised;
   const b = Buffer.alloc(239);
   ARTNET_ID.copy(b, 0);
   b.writeUInt16LE(OP_POLL_REPLY, 8);
@@ -161,7 +170,9 @@ function statusJson() {
   return {
     http: HTTP_PORT,
     artnet: ARTNET_PORT,
-    addresses: Object.values(os.networkInterfaces()).flat().filter((n) => n && n.family === 'IPv4').map((n) => n.address),
+    addresses: ADVERTISE.length
+      ? ADVERTISE
+      : Object.values(os.networkInterfaces()).flat().filter((n) => n && n.family === 'IPv4').map((n) => n.address),
     packets: stats.packets,
     polls: stats.polls,
     lastFrom: stats.lastFrom,
@@ -209,5 +220,14 @@ setInterval(() => {
 server.listen(HTTP_PORT, () => {
   console.log(`[http]   Open the simulator at http://localhost:${HTTP_PORT}/`);
   const addrs = statusJson().addresses.filter((a) => a !== '127.0.0.1');
-  if (addrs.length) console.log(`[artnet] Send Art-Net to: ${addrs.join(', ')} (or 127.0.0.1 / broadcast)`);
+  if (addrs.length) console.log(`[artnet] Send Art-Net to: ${addrs.join(', ')}${ADVERTISE.length ? '' : ' (or 127.0.0.1 / broadcast)'}`);
 });
+
+// コンテナの PID 1 で動くとき、シグナルに既定の処理がないので自分で終了する
+for (const sig of ['SIGTERM', 'SIGINT']) {
+  process.on(sig, () => {
+    server.close();
+    udp.close();
+    process.exit(0);
+  });
+}
