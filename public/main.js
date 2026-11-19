@@ -8,6 +8,7 @@ import { createFixture, shared, ceilingUniform } from './fixtures.js';
 
 const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
+const prefs = (() => { try { return JSON.parse(localStorage.getItem('dmxsim.view') || '{}') ?? {}; } catch { return {}; } })();
 
 // ------------------------------------------------------------ 設定読み込み
 const [profiles, patch] = await Promise.all([
@@ -18,7 +19,15 @@ const ceiling = patch.venue?.ceiling ?? 3.2;
 const plan = await loadFloorplan(patch.venue?.floorplan ?? '/assets/commons.svg');
 
 // ------------------------------------------------------------ レンダラ・シーン
-const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: params.has('shot') });
+const powerPreference = prefs.gpu === 'high-performance' ? 'high-performance' : 'low-power';
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference, preserveDrawingBuffer: params.has('shot') });
+function showGpuRenderer() {
+  const gl = renderer.getContext();
+  const info = gl.getExtension('WEBGL_debug_renderer_info');
+  $('#gpu-renderer').textContent = (info && gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) || 'Unavailable in this browser';
+}
+showGpuRenderer();
+renderer.domElement.addEventListener('webglcontextrestored', showGpuRenderer);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -148,7 +157,6 @@ $('#cams').addEventListener('click', (e) => e.target.dataset.cam && setCam(e.tar
 // ------------------------------------------------------------ Art-Net (SSE)
 const universes = new Map();
 let lastStatus = null;
-let lastDmxAt = 0;
 
 function b64ToBytes(s) {
   const bin = atob(s);
@@ -158,10 +166,10 @@ function b64ToBytes(s) {
 }
 
 function applyUniverse(u, data) {
+  const isNew = !universes.has(u);
   universes.set(u, data);
   for (const f of fixtures) if ((f.cfg.universe ?? 0) === u) f.setDmx(data);
-  lastDmxAt = performance.now();
-  refreshUniverseSelect();
+  if (isNew) refreshUniverseSelect();
 }
 
 const es = new EventSource('/events');
@@ -204,6 +212,7 @@ function renderStatus(err = false) {
 
 // ------------------------------------------------------------ パネル: 灯体
 const list = $('#fixture-list');
+const swatchColor = new THREE.Color();
 let selected = null;
 const rows = fixtures.map((f) => {
   const li = document.createElement('li');
@@ -239,14 +248,15 @@ function select(f) {
 function updateFixturePanel() {
   for (const r of rows) {
     const f = r.f;
-    const c = f.color.clone().multiplyScalar(0.25 + f.level * 0.75);
+    const c = swatchColor.copy(f.color).multiplyScalar(0.25 + f.level * 0.75);
     r.swatch.style.background = f.level > 0.01 ? `#${c.getHexString(THREE.SRGBColorSpace)}` : '#111';
     r.swatch.style.boxShadow = f.level > 0.01 ? `0 0 ${4 + f.level * 10}px #${f.color.getHexString(THREE.SRGBColorSpace)}` : 'none';
-    r.sub.textContent = `${Math.round(f.level * 100)}%  ${f.status}`;
+    const status = `${Math.round(f.level * 100)}%  ${f.status}`;
+    if (r.sub.textContent !== status) r.sub.textContent = status;
     if (f === selected) {
       for (let i = 0; i < f.values.length; i++) {
         r.bars[i].style.width = `${(f.values[i] / 255) * 100}%`;
-        r.vals[i].textContent = f.values[i];
+        if (r.vals[i].textContent !== String(f.values[i])) r.vals[i].textContent = f.values[i];
       }
     }
   }
@@ -279,6 +289,8 @@ for (let i = 0; i < 512; i++) {
   cells.push({ d, bar: d.firstChild, txt: d.lastChild });
 }
 const uniSel = $('#dmx-universe');
+const dmxInfo = $('#dmx-info');
+let displayedDmx = null;
 function refreshUniverseSelect() {
   const want = new Set([0, ...fixtures.map((f) => f.cfg.universe ?? 0), ...universes.keys()]);
   if (uniSel.options.length === want.size) return;
@@ -308,12 +320,15 @@ refreshUniverseSelect();
 markPatch();
 function updateDmxPanel() {
   const data = universes.get(Number(uniSel.value || 0));
-  $('#dmx-info').textContent = data ? '' : 'Nothing received yet';
+  if (data === displayedDmx) return;
+  dmxInfo.textContent = data ? '' : 'Nothing received yet';
   for (let i = 0; i < 512; i++) {
-    const v = data ? data[i] : 0;
+    const v = data?.[i] ?? 0;
+    if (v === (displayedDmx?.[i] ?? 0)) continue;
     cells[i].bar.style.height = `${(v / 255) * 100}%`;
     cells[i].txt.textContent = v;
   }
+  displayedDmx = data;
 }
 
 // ------------------------------------------------------------ パネル: タブ・表示設定
@@ -324,8 +339,13 @@ function showTab(name) {
 $('.tabs').addEventListener('click', (e) => e.target.dataset.tab && showTab(e.target.dataset.tab));
 $('#panel-toggle').addEventListener('click', () => $('#panel').classList.toggle('open'));
 
-const prefs = (() => { try { return JSON.parse(localStorage.getItem('dmxsim.view') || '{}'); } catch { return {}; } })();
 const savePrefs = () => { try { localStorage.setItem('dmxsim.view', JSON.stringify(prefs)); } catch {} };
+$('#gpu').value = powerPreference;
+$('#gpu').addEventListener('change', (e) => {
+  prefs.gpu = e.target.value;
+  savePrefs();
+  location.reload();
+});
 function bindPref(id, prop, apply) {
   const el = $(id);
   if (prefs[prop] !== undefined) el[el.type === 'checkbox' ? 'checked' : 'value'] = prefs[prop];
@@ -335,9 +355,19 @@ function bindPref(id, prop, apply) {
 }
 bindPref('#haze', 'haze', (v) => (shared.haze = Number(v)));
 bindPref('#bloom', 'bloom', (v) => (shared.bloom = v));
+bindPref('#shadows', 'shadows', (v) => {
+  if (renderer.shadowMap.enabled === v) return;
+  renderer.shadowMap.enabled = v;
+  scene.traverse((object) => {
+    if (object.isMesh) object.material.needsUpdate = true;
+  });
+});
 bindPref('#walls', 'walls', (v) => {
   venue.wallGroup.visible = v !== 'off';
   venue.wallGroup.scale.y = v === 'low' ? 1.1 / ceiling : 1;
+  scene.traverse((object) => {
+    if (object.isSpotLight && object.castShadow) object.shadow.needsUpdate = true;
+  });
 });
 bindPref('#worklight', 'work', (v) => { work.intensity = v ? 1.5 : 0; ambient.intensity = v ? 0.9 : 0.25; });
 // フレームレート上限（0 = 無制限）。高リフレッシュレートの画面でGPUを使い切らないように
@@ -414,7 +444,7 @@ function frame(now = performance.now()) {
   uiTick += dt;
   if (uiTick > 0.1) {
     uiTick = 0;
-    updateFixturePanel();
+    if ($('[data-pane="fixtures"]').classList.contains('on')) updateFixturePanel();
     if ($('[data-pane="dmx"]').classList.contains('on')) updateDmxPanel();
   }
 }
