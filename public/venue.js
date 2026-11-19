@@ -7,7 +7,9 @@ import * as THREE from 'three';
  * 1マス(グリッド間隔) = 1m としてメートルに変換する。
  */
 export async function loadFloorplan(url) {
-  const text = await (await fetch(url)).text();
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Could not load floor plan: HTTP ${response.status}`);
+  const text = await response.text();
   const host = document.createElement('div');
   host.style.cssText = 'position:absolute;left:-100000px;top:0;visibility:hidden;';
   host.innerHTML = text.replace(/<\?xml[^>]*>/, '').replace(/<!DOCTYPE[^>]*>/, '');

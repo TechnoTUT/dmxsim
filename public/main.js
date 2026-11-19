@@ -317,13 +317,6 @@ function updateDmxPanel() {
 }
 
 // ------------------------------------------------------------ パネル: タブ・表示設定
-function showTab(name) {
-  document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
-  document.querySelectorAll('#panel section').forEach((s) => s.classList.toggle('on', s.dataset.pane === name));
-}
-$('.tabs').addEventListener('click', (e) => e.target.dataset.tab && showTab(e.target.dataset.tab));
-$('#panel-toggle').addEventListener('click', () => $('#panel').classList.toggle('open'));
-
 const prefs = (() => { try { return JSON.parse(localStorage.getItem('dmxsim.view') || '{}'); } catch { return {}; } })();
 const savePrefs = () => { try { localStorage.setItem('dmxsim.view', JSON.stringify(prefs)); } catch {} };
 function bindPref(id, prop, apply) {
