@@ -140,7 +140,7 @@ const MIME = {
 const MOUNTS = [
   ['/vendor/three/', path.join(ROOT, 'node_modules/three/')],
   ['/config/', path.join(ROOT, 'config/')],
-  ['/assets/', ROOT + '/'], // commons.svg, layout.png
+  ['/assets/', path.join(ROOT, path.sep)], // commons.svg, layout.png
   ['/', path.join(ROOT, 'public/')],
 ];
 
