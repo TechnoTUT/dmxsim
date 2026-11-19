@@ -48,6 +48,14 @@
     <section data-pane="view">
       <label class="ctl">Haze <input type="range" id="haze" min="0" max="1.5" step="0.01" value="1.5" /></label>
       <label class="ctl">Bloom <input type="checkbox" id="bloom" checked /></label>
+      <label class="ctl">Shadows <input type="checkbox" id="shadows" checked /></label>
+      <label class="ctl">GPU
+        <select id="gpu">
+          <option value="low-power">Power saving</option>
+          <option value="high-performance">High performance</option>
+        </select>
+      </label>
+      <p class="muted">WebGL renderer: <span id="gpu-renderer"></span></p>
       <label class="ctl">Walls
         <select id="walls">
           <option value="full" selected>Full height</option>

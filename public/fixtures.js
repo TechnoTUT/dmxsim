@@ -4,6 +4,9 @@ import { getPattern } from './laser-patterns.js';
 
 const DEG = Math.PI / 180;
 const UP = new THREE.Vector3(0, 1, 0);
+const FORWARD = new THREE.Vector3(0, 0, 1);
+const RIGHT = new THREE.Vector3(1, 0, 0);
+const SHADOW_CHANGE_SQ = 1e-10;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const inRange = (v, a, b) => v >= a && v <= b;
 
@@ -95,6 +98,7 @@ uniform vec3 uColor;
 uniform float uIntensity;
 uniform sampler2D uGobo;
 uniform float uGoboRot;
+uniform bool uHasGobo;
 uniform mat4 uInvModel;
 uniform float uCeiling;
 uniform float uLength;
@@ -129,31 +133,48 @@ void main() {
     if (dot(q, q) <= 1.0) tEnter = min(tEnter, t);
   }
   tEnter = clamp(tEnter, 0.0, 1.0);
-  float worldLen = length(vWorld - cameraPosition) * (1.0 - tEnter);
-
-  const int STEPS = 16; // 1画素あたりのサンプル数。jitter で縞を目立たなくしている
-  float dt = (1.0 - tEnter) / float(STEPS);
+  float tExit = 1.0;
+  // 床・天井の間にある区間だけを積分する
+  float dy = vWorld.y - cameraPosition.y;
+  if (abs(dy) > 1e-7) {
+    float floorT = -cameraPosition.y / dy;
+    float ceilingT = (uCeiling - cameraPosition.y) / dy;
+    tEnter = max(tEnter, min(floorT, ceilingT));
+    tExit = min(tExit, max(floorT, ceilingT));
+  } else if (cameraPosition.y < 0.0 || cameraPosition.y > uCeiling) {
+    tExit = tEnter;
+  }
+  if (tExit <= tEnter) {
+    gl_FragColor = vec4(0.0);
+    return;
+  }
+  float worldLen = length(vWorld - cameraPosition) * (tExit - tEnter);
+  const int MAX_STEPS = 16;
+  // 模様のあるゴボは細部を保ち、オープンの光は短い区間ほどサンプルを減らす
+  int steps = uHasGobo ? MAX_STEPS : int(clamp(ceil(worldLen * 4.0), 4.0, 16.0));
+  float dt = (tExit - tEnter) / float(steps);
   float jitter = hash(gl_FragCoord.xy);
   float cr = cos(uGoboRot), sr = sin(uGoboRot);
   float acc = 0.0;
-  for (int i = 0; i < STEPS; i++) {
+  for (int i = 0; i < MAX_STEPS; i++) {
+    if (i >= steps) break;
     float t = tEnter + dt * (float(i) + jitter);
-    // 天井より上・床より下のサンプルは数えない（光が天井を抜けない）
-    float wy = mix(cameraPosition.y, vWorld.y, t);
-    if (wy > uCeiling || wy < 0.0) continue;
     vec3 p = ro + rd * t;
     float z = max(p.z, 1e-4);
     vec2 q = p.xy / z;
     float r = length(q);
     if (r > 1.0) continue;
-    vec2 uv = vec2(cr * q.x - sr * q.y, sr * q.x + cr * q.y) * 0.5 + 0.5;
-    float g = texture2D(uGobo, uv).r;
-    float edge = smoothstep(1.0, 0.75, r);
+    float g = step(r, 0.96);
+    if (uHasGobo) {
+      vec2 uv = vec2(cr * q.x - sr * q.y, sr * q.x + cr * q.y) * 0.5 + 0.5;
+      g = texture2D(uGobo, uv).r;
+    }
+    float edge = 1.0 - smoothstep(0.75, 1.0, r);
     float d = z * uLength;
     float fall = 1.0 / (0.12 + d * d * 0.22);
     acc += g * edge * fall;
   }
-  acc *= worldLen / float(STEPS) * uSpread;
+  acc *= worldLen / float(steps) * uSpread;
   gl_FragColor = vec4(uColor * uIntensity * acc, 1.0);
 }`;
 
@@ -172,6 +193,7 @@ class Beam {
         uIntensity: { value: 0 },
         uGobo: { value: goboTexture(0) },
         uGoboRot: { value: 0 },
+        uHasGobo: { value: false },
         uInvModel: { value: new THREE.Matrix4() },
         uLength: { value: 10 },
         uSpread: { value: (Math.tan(6 * DEG) / Math.tan(halfAngleRad)) ** 1.2 },
@@ -184,14 +206,13 @@ class Beam {
       toneMapped: false,
     });
     this.mesh = new THREE.Mesh(beamGeo, this.mat);
-    this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 2;
     scene.add(this.mesh);
     this._t = new THREE.Vector3();
   }
   set(origin, dir, length, color, intensity, gobo = 0, goboRot = 0) {
     const m = this.mesh;
-    m.visible = intensity > 0.002;
+    m.visible = intensity > 0.002 && shared.haze > 0;
     if (!m.visible) return;
     m.position.copy(origin);
     m.lookAt(this._t.copy(origin).add(dir));
@@ -205,6 +226,7 @@ class Beam {
     u.uIntensity.value = intensity * shared.haze;
     u.uGobo.value = goboTexture(gobo);
     u.uGoboRot.value = goboRot;
+    u.uHasGobo.value = gobo !== 0;
   }
 }
 
@@ -281,14 +303,17 @@ class Fixture {
     this.root.position.copy(P(cfg.x, cfg.y, cfg.h));
     ctx.scene.add(this.root);
     this.values = new Uint8Array(profile.channels.length);
+    this.channelIndices = new Map();
+    for (const [i, { key }] of profile.channels.entries()) {
+      if (!this.channelIndices.has(key)) this.channelIndices.set(key, i);
+    }
     this.color = new THREE.Color();
     this.level = 0; // UI表示用 0..1
     this.status = '';
     this.pickables = [];
   }
   ch(key) {
-    const i = this.profile.channels.findIndex((c) => c.key === key);
-    return i >= 0 ? this.values[i] : 0;
+    return this.values[this.channelIndices.get(key)] ?? 0;
   }
   setDmx(universeData) {
     const a = this.cfg.address - 1;
@@ -341,6 +366,7 @@ export class MovingSpot extends Fixture {
 
     this.light = new THREE.SpotLight(0xffffff, 0, 40, (profile.beamAngle / 2) * DEG * 1.08, 0.25, 1.6);
     this.light.castShadow = true;
+    this.light.shadow.autoUpdate = false;
     this.light.shadow.mapSize.set(512, 512);
     this.light.shadow.camera.near = 0.2;
     this.light.shadow.camera.far = 40;
@@ -357,6 +383,8 @@ export class MovingSpot extends Fixture {
     this.resetUntil = 0;
     this._o = new THREE.Vector3();
     this._d = new THREE.Vector3();
+    this._target = new THREE.Vector3();
+    this._shadowUp = new THREE.Vector3();
     this._c = new THREE.Color();
   }
 
@@ -454,15 +482,25 @@ export class MovingSpot extends Fixture {
     this.glow.visible = level > 0.01;
     this.lensMat.color.copy(col).multiplyScalar(0.15 + level);
 
-    this.light.position.copy(o);
-    this.light.target.position.copy(o).addScaledVector(d, 5);
     this.light.color.copy(col);
     this.light.intensity = level * 180;
     this.light.map = goboTexture(gobo);
-    // 投影の回転（ゴボのシェイク）。up ベクトルをビーム軸まわりに回す
-    const ref = Math.abs(d.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : UP;
-    const upv = new THREE.Vector3().crossVectors(d, ref).normalize().applyAxisAngle(d, goboRot + this.pan);
-    this.light.shadow.camera.up.copy(upv);
+    if (level > 0) {
+      const target = this._target.copy(o).addScaledVector(d, 5);
+      const ref = Math.abs(d.y) > 0.9 ? RIGHT : UP;
+      const up = this._shadowUp.crossVectors(d, ref).normalize().applyAxisAngle(d, goboRot + this.pan);
+      const shadow = this.light.shadow;
+      // 影を落とす会場は固定なので、照射方向や投影の回転が変わったときだけ描き直す
+      if (!shadow.map ||
+          this.light.position.distanceToSquared(o) > SHADOW_CHANGE_SQ ||
+          this.light.target.position.distanceToSquared(target) > SHADOW_CHANGE_SQ ||
+          shadow.camera.up.distanceToSquared(up) > SHADOW_CHANGE_SQ) {
+        this.light.position.copy(o);
+        this.light.target.position.copy(target);
+        shadow.camera.up.copy(up);
+        shadow.needsUpdate = true;
+      }
+    }
   }
 }
 
@@ -484,6 +522,8 @@ export class Par extends Fixture {
     this.pickables.push(can);
     const aim = cfg.aim ? P(cfg.aim[0], cfg.aim[1], cfg.aim[2]) : P(cfg.x, cfg.y, 0);
     this.dir = aim.clone().sub(this.root.position).normalize();
+    this.origin = this.root.position.clone().addScaledVector(this.dir, 0.11);
+    this.beamLength = ctx.cast(this.origin, this.dir);
     this.body.lookAt(aim);
 
     this.beam = new Beam(ctx.scene, (profile.beamAngle / 2) * DEG);
@@ -503,7 +543,7 @@ export class Par extends Fixture {
       Math.min(1, B + W * 0.9),
       THREE.SRGBColorSpace,
     );
-    let level = this.profile.channels.some((ch) => ch.key === 'dimmer') ? this.ch('dimmer') / 255 : 1;
+    let level = this.channelIndices.has('dimmer') ? this.ch('dimmer') / 255 : 1;
     const st = this.ch('strobe');
     if (st > 5) level *= strobeGate(t, 1 + (st / 255) * 19) ? 1 : 0;
     const peak = Math.max(c.r, c.g, c.b);
@@ -512,9 +552,8 @@ export class Par extends Fixture {
     this.level = out;
     this.color.copy(norm);
     this.status = `RGBWA ${this.values.join(',')}`;
-    const o = this.root.position.clone().addScaledVector(this.dir, 0.11);
-    const L = this.ctx.cast(o, this.dir);
-    this.beam.set(o, this.dir, L, norm, out * 0.7, 0, 0);
+    const o = this.origin;
+    this.beam.set(o, this.dir, this.beamLength, norm, out * 0.7, 0, 0);
     this.glow.position.copy(o);
     this.glow.material.color.copy(norm).multiplyScalar(out);
     this.glow.scale.setScalar(0.3 + out * 0.3);
@@ -652,11 +691,14 @@ export class TwinkleBall extends Fixture {
     this.mat.uniforms.uColor.value.copy(c);
     // 本数が増えても空中のビーム全体が明るくなりすぎないよう、1本あたりを弱める
     this.mat.uniforms.uIntensity.value = level * shared.haze * 0.9 * Math.sqrt(64 / this.dirs.length);
-    this.inst.visible = out > 0.002;
+    this.inst.visible = out > 0.002 && shared.haze > 0;
     this.ballMat.emissive.copy(norm).multiplyScalar(out * 0.6);
     this.spotMat.uniforms.uColor.value.copy(c);
     this.spotMat.uniforms.uIntensity.value = level * 1.6;
-    this.spots.visible = level > 0.002;
+    this.spots.visible = level > 0.002 && peak > 0;
+    // 消灯中は着弾計算を休み、点灯時も角度が変わったときだけ更新する
+    if ((!this.inst.visible && !this.spots.visible) || this.rot === this.lastBeamRotation) return;
+    this.lastBeamRotation = this.rot;
     const o = this.root.position;
     const half = 0.25 * DEG;
     const spotHalf = 1.4 * DEG; // 着弾点の広がり（ドームのレンズで拡散）
@@ -665,7 +707,7 @@ export class TwinkleBall extends Fixture {
       const d = this._v.copy(this.dirs[i]).applyAxisAngle(UP, this.rot);
       const hitL = this.ctx.cast.hit(o, d, n);
       const L = Math.min(12, hitL); // 細いビームは遠くまで見えない
-      this._q.setFromUnitVectors(new THREE.Vector3(0, 0, 1), d);
+      this._q.setFromUnitVectors(FORWARD, d);
       const r = Math.tan(half) * L;
       this._m.compose(o, this._q, this._s.set(r, r, L));
       this.inst.setMatrixAt(i, this._m);
@@ -713,13 +755,13 @@ export class Laser extends Fixture {
 
     const mkLines = (opacity) => {
       const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAXPTS * 6), 3));
-      geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(MAXPTS * 6), 3));
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAXPTS * 6), 3).setUsage(THREE.DynamicDrawUsage));
+      geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(MAXPTS * 6), 3).setUsage(THREE.DynamicDrawUsage));
+      geo.boundingSphere = new THREE.Sphere();
       const m = new THREE.LineSegments(
         geo,
         new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }),
       );
-      m.frustumCulled = false;
       ctx.scene.add(m);
       return m;
     };
@@ -728,6 +770,9 @@ export class Laser extends Fixture {
     this.state = { zoom: 0, xr: 0, yr: 0, zr: 0, pan: 0, tilt: 0, draw: 0, color: 0, flash: 0, autoNext: 0, auto: null };
     this._d = new THREE.Vector3();
     this._p = new THREE.Vector3();
+    this._bounds = new THREE.Box3();
+    this._previousHit = new THREE.Vector3();
+    this._color = new THREE.Color();
   }
 
   update(dt, t) {
@@ -737,7 +782,6 @@ export class Laser extends Fixture {
     const on = mode > 20;
     this.status = '';
     if (!on) { this.rays.visible = this.outline.visible = false; this.level = 0; this.status = 'OFF'; return; }
-    this.rays.visible = this.outline.visible = true;
 
     let group = Math.floor(v('group') / 64);
     let index = Math.floor(v('pattern') / 16);
@@ -821,9 +865,9 @@ export class Laser extends Fixture {
     const stride = Math.max(1, Math.ceil(n / MAXPTS));
     let ri = 0, oi = 0;
     let prev = null;
-    const col = new THREE.Color();
+    const col = this._color;
     const o = this.aperture;
-    let lit = 0;
+    const bounds = this._bounds.set(o, o);
     for (let i = 0; i < limit && ri < MAXPTS; i += stride) {
       const p = pts[i];
       if (!p || !flashOn) { prev = null; continue; }
@@ -837,6 +881,7 @@ export class Laser extends Fixture {
       const d = this._d.copy(this.fwd).addScaledVector(this.right, tu).addScaledVector(this.upv, tw).normalize();
       const L = this.ctx.cast(o, d);
       const hit = this._p.copy(o).addScaledVector(d, L);
+      bounds.expandByPoint(hit);
       colorAt(i, n, col);
       rp.set([o.x, o.y, o.z, hit.x, hit.y, hit.z], ri * 6);
       rc.set([col.r, col.g, col.b, col.r * 0.25, col.g * 0.25, col.b * 0.25], ri * 6);
@@ -846,17 +891,22 @@ export class Laser extends Fixture {
         oc.set([col.r, col.g, col.b, col.r, col.g, col.b], oi * 6);
         oi++;
       }
-      prev = (prev ?? new THREE.Vector3()).copy(hit);
-      lit++;
+      prev = this._previousHit.copy(hit);
     }
-    this.rays.geometry.setDrawRange(0, ri * 2);
-    this.outline.geometry.setDrawRange(0, oi * 2);
+    // 実際に使う頂点だけを更新し、光が届く範囲で画面外判定する
+    for (const [mesh, segments] of [[this.rays, ri], [this.outline, oi]]) {
+      mesh.visible = segments > 0;
+      if (!mesh.visible) continue;
+      mesh.geometry.setDrawRange(0, segments * 2);
+      bounds.getBoundingSphere(mesh.geometry.boundingSphere);
+      for (const attr of [mesh.geometry.attributes.position, mesh.geometry.attributes.color]) {
+        attr.clearUpdateRanges();
+        attr.addUpdateRange(0, segments * 6);
+        attr.needsUpdate = true;
+      }
+    }
     this.rays.material.opacity = 0.25 + shared.haze * 0.6;
-    this.rays.geometry.attributes.position.needsUpdate = true;
-    this.rays.geometry.attributes.color.needsUpdate = true;
-    this.outline.geometry.attributes.position.needsUpdate = true;
-    this.outline.geometry.attributes.color.needsUpdate = true;
-    this.level = lit ? 1 : 0;
+    this.level = ri ? 1 : 0;
     colorAt(0, 1, this.color);
     this.status += `G${group + 1}-${index + 1}`;
   }

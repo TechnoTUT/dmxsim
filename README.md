@@ -98,11 +98,14 @@ Each fixture is sent on the universe set in `patch.json`. Stop the demo before u
   </tr>
   <tr>
     <td valign="top"><b>DMX tab</b>: all 512 channels of the selected universe. Patched ranges are outlined, one color per fixture; hover a cell to see which fixture and channel it is.</td>
-    <td valign="top"><b>View tab</b>: haze, bloom, walls (full height / waist height / hidden), work light, frame rate limit, resolution, and the addresses to send Art-Net to.</td>
+    <td valign="top"><b>View tab</b>: haze, bloom, shadows, GPU preference, walls (full height / waist height / hidden), work light, frame rate limit, resolution, and the addresses to send Art-Net to.</td>
   </tr>
 </table>
 
 View settings are saved in the browser.
+
+GPU defaults to **Power saving**, which asks the browser to prefer the integrated GPU when available. **High performance** asks it to prefer a faster GPU. Changing this setting reloads the view. The browser and operating system make the final GPU selection.
+The **WebGL renderer** readout shows the graphics driver reported by the browser when available.
 
 ### Camera controls
 
@@ -187,6 +190,8 @@ If you redraw the plan with the same layer structure, the changes show up automa
 - **Twinkle Ball**: master dimmer, strobe, motor angle/rotation. The R/G/B LEDs are not mixed: each beam is red, green or blue, and a spot of that color is drawn where it lands. The auto/sound programs are not documented, so they are approximated by stepping through colors.
 - **Beams** are ray-marched through haze. They stop at walls, pillars, the floor and the ceiling, and pass through the glass doors. The ceiling is only visible from below, so it never blocks the overview camera.
 
+Beams and laser lines outside the camera view are culled using their full light extent. Haze is sampled only between the floor and the ceiling, with fewer samples on short paths through open beams. Moving heads reuse their shadow maps while the projection and wall display stay fixed.
+
 ## Troubleshooting
 
 | Symptom | What to check |
@@ -195,7 +200,7 @@ If you redraw the plan with the same layer structure, the changes show up automa
 | `EADDRINUSE` on startup | Another program is using the port. Pick another with `--http` or `--artnet` |
 | Output flickers | Two sources are sending to the same universe (e.g. the demo and your lighting software) |
 | A fixture does not respond | Its address and universe in `patch.json` match your software's patch, and the address-overlap warning is not shown |
-| High GPU usage | In the View tab, lower Resolution, turn off Bloom, or set the frame rate limit to 30 fps |
+| High CPU or GPU usage | In the View tab, try a 30 fps frame rate limit, lower Resolution, and turn off Bloom or Shadows |
 
 ## Running in a container
 

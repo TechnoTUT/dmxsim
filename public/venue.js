@@ -293,24 +293,27 @@ export function buildProps(props = []) {
  * cast(o, d) は距離を返す。cast.hit(o, d, outNormal) は距離を返し、当たった面の法線を outNormal に入れる。
  */
 export function makeRaycaster(colliders, ceiling, maxDist = 40) {
+  // 会場の壁は固定なので、線分の向きはレイごとに計算し直さない
+  const segments = colliders.map(({ a: [x, z], b, h0, h1 }) => ({
+    x, z, ex: b[0] - x, ez: b[1] - z, h0, h1,
+  }));
   function trace(o, d, n) {
     let best = maxDist;
     let nx = 0, ny = 0, nz = 0;
     if (d.y < -1e-6) { const t = -o.y / d.y; if (t < best) { best = t; nx = 0; ny = 1; nz = 0; } }
     if (d.y > 1e-6) { const t = (ceiling - o.y) / d.y; if (t < best) { best = t; nx = 0; ny = -1; nz = 0; } }
     const dx = d.x, dz = d.z;
-    for (const c of colliders) {
-      const ex = c.b[0] - c.a[0], ez = c.b[1] - c.a[1];
+    for (const { x, z, ex, ez, h0, h1 } of segments) {
       const den = dx * ez - dz * ex;
       if (Math.abs(den) < 1e-9) continue;
-      const wx = c.a[0] - o.x, wz = c.a[1] - o.z;
+      const wx = x - o.x, wz = z - o.z;
       const t = (wx * ez - wz * ex) / den;
       if (t <= 1e-4 || t >= best) continue;
       const s = (wx * dz - wz * dx) / den;
       if (s < 0 || s > 1) continue;
-      if (c.h0 !== undefined) {
+      if (h0 !== undefined) {
         const yh = o.y + d.y * t;
-        if (yh < c.h0 || yh > c.h1) continue;
+        if (yh < h0 || yh > h1) continue;
       }
       best = t;
       if (n) {
